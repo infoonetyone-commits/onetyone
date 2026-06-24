@@ -20,6 +20,7 @@ export interface Post {
   caption: string
   graphicUrl: string | null
   clientApproval: string // the client's own Approved / Changes Requested / Pending state
+  clientNote: string // the client's last comment (shown back to them)
   // NOTE: internal "Notes" field (consent flags etc.) is deliberately never exposed.
 }
 
@@ -111,6 +112,7 @@ export async function getPosts(databaseId?: string): Promise<Post[]> {
         caption: readText(p['Caption']),
         graphicUrl: readUrl(p['Graphic Link']),
         clientApproval: readSelect(p['Client Status']),
+        clientNote: readText(p['Client Note']),
       }
     })
     /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -146,33 +148,47 @@ function mock(
     caption,
     graphicUrl: null,
     clientApproval: '',
+    clientNote: '',
   }
 }
 
 /**
- * Write the client's approval decision back to their Notion page.
- * Requires a "Client Status" Select property on the database.
- * Best-effort: returns false (and logs) on any failure so callers can still
- * fall back to email notification.
+ * Write the client's approval decision (and optional note) back to their Notion page.
+ * Writes a "Client Status" Select and a "Client Note" text property.
+ * Resilient: if "Client Note" doesn't exist yet, retries with status only.
+ * Best-effort — returns false (and logs) on failure so callers can still email.
  */
 export async function setClientApproval(
   pageId: string,
   status: 'Approved' | 'Changes Requested' | 'Pending',
+  note = '',
 ): Promise<boolean> {
   const token = process.env.NOTION_TOKEN
   if (!token || !pageId) return false
+  const notion = new Client({ auth: token })
+
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const statusProp = { 'Client Status': { select: { name: status } } }
+  const noteProp = {
+    'Client Note': { rich_text: note ? [{ text: { content: note.slice(0, 1900) } }] : [] },
+  }
   try {
-    const notion = new Client({ auth: token })
     await notion.pages.update({
       page_id: pageId,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      properties: { 'Client Status': { select: { name: status } } } as any,
+      properties: { ...statusProp, ...noteProp } as any,
     })
     return true
-  } catch (err) {
-    console.error('[notion] setClientApproval failed:', err)
-    return false
+  } catch {
+    // "Client Note" may not exist — fall back to writing just the status.
+    try {
+      await notion.pages.update({ page_id: pageId, properties: statusProp as any })
+      return true
+    } catch (err) {
+      console.error('[notion] setClientApproval failed:', err)
+      return false
+    }
   }
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 }
 
 export const MOCK_POSTS: Post[] = [

@@ -4,7 +4,12 @@ import nodemailer from 'nodemailer'
 import { getClient } from '../../lib/clients'
 import { setClientApproval } from '../../lib/notion'
 
-export type FeedbackState = { success: boolean; message: string } | null
+export type FeedbackState = {
+  success: boolean
+  message: string
+  status?: 'Approved' | 'Changes Requested' // echoed back so the UI updates instantly
+  note?: string
+} | null
 
 export async function submitFeedback(
   _prev: FeedbackState,
@@ -27,9 +32,10 @@ export async function submitFeedback(
   }
 
   const isApprove = action === 'Approved'
+  const newStatus = isApprove ? 'Approved' : 'Changes Requested'
 
-  // 1) Write the decision back to the Notion board (best-effort).
-  await setClientApproval(postId, isApprove ? 'Approved' : 'Changes Requested')
+  // 1) Write the decision + note back to the Notion board (best-effort).
+  await setClientApproval(postId, newStatus, comment)
   const tag = isApprove ? '✅ APPROVED' : '✏️ CHANGES REQUESTED'
   const accent = isApprove ? '#1F8A55' : '#B8860B'
 
@@ -70,6 +76,8 @@ export async function submitFeedback(
       message: isApprove
         ? 'Approved — thanks! We’ve let OnetyOne know. 🎉'
         : 'Sent! OnetyOne has your changes and will be in touch.',
+      status: newStatus,
+      note: comment,
     }
   } catch (err) {
     console.error('[portal] feedback email error:', err)

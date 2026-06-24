@@ -439,25 +439,36 @@ function PostModal({ post, accent, slug, onClose }: { post: Post; accent: string
 
 function FeedbackSection({ slug, post }: { slug: string; post: Post }) {
   const [state, formAction, pending] = useActionState(submitFeedback, null)
-  const already = post.clientApproval // 'Approved' | 'Changes Requested' | 'Pending' | ''
 
-  if (state?.success) {
-    return (
-      <div className="mt-6 rounded-2xl px-5 py-6 text-center" style={{ background: '#E4F5EC', border: '1px solid #Bfe6cf' }}>
-        <CheckCircle2 className="w-7 h-7 mx-auto mb-2" style={{ color: '#1F8A55' }} />
-        <p className="text-sm font-semibold" style={{ color: '#1F6B45' }}>{state.message}</p>
-      </div>
-    )
-  }
+  // Current decision: prefer the just-submitted result, else what's in Notion.
+  const status = state?.success ? state.status : post.clientApproval
+  const note = state?.success ? state.note ?? '' : post.clientNote
+  const isApproved = status === 'Approved'
+  const isChanges = status === 'Changes Requested'
 
   return (
     <div className="mt-6 pt-5" style={{ borderTop: '1px solid #EFEAF8' }}>
       <p className="text-[11px] font-semibold tracking-wider uppercase mb-3" style={{ color: '#9B8BC2' }}>Your feedback</p>
 
-      {already && (
-        <p className="text-xs mb-3 px-3 py-2 rounded-lg" style={{ background: '#F4F0FB', color: '#6B5B95' }}>
-          You previously marked this <strong>{already}</strong>. You can update it below.
-        </p>
+      {/* current decision banner */}
+      {isApproved && (
+        <div className="mb-3 flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: '#E4F5EC', border: '1px solid #C2E6D2' }}>
+          <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: '#1F8A55' }} />
+          <span className="text-xs font-semibold" style={{ color: '#1F6B45' }}>
+            {state?.success ? state.message : 'You’ve approved this post.'}
+          </span>
+        </div>
+      )}
+      {isChanges && (
+        <div className="mb-3 px-3 py-2.5 rounded-xl" style={{ background: '#FBF3DD', border: '1px solid #EBD9A8' }}>
+          <div className="flex items-center gap-2 mb-1">
+            <PencilRuler className="w-4 h-4 flex-shrink-0" style={{ color: '#B8860B' }} />
+            <span className="text-xs font-semibold" style={{ color: '#8A6400' }}>You requested changes</span>
+          </div>
+          {note
+            ? <p className="text-xs whitespace-pre-wrap pl-6" style={{ color: '#6B5B95' }}>“{note}”</p>
+            : <p className="text-xs pl-6" style={{ color: '#9B8BC2' }}>OnetyOne has your request and will be in touch.</p>}
+        </div>
       )}
 
       <form action={formAction} className="space-y-3">
@@ -470,29 +481,40 @@ function FeedbackSection({ slug, post }: { slug: string; post: Post }) {
         <textarea
           name="comment"
           rows={3}
-          placeholder="Any comments or changes? (optional when approving, required for changes)"
+          defaultValue={isChanges ? note : ''}
+          placeholder={isApproved ? 'Changed your mind? Add a note and request changes…' : 'Any comments or changes? (optional when approving, required for changes)'}
           className="w-full text-sm rounded-xl px-3 py-2.5 outline-none resize-none"
           style={{ background: '#F7F3FD', border: '1px solid #E7E0F5', color: '#3D2A66' }}
         />
 
-        {state?.message && !state.success && (
+        {state && !state.success && (
           <p className="text-xs font-medium" style={{ color: '#C0392B' }}>{state.message}</p>
         )}
 
         <div className="flex gap-2">
           <button
-            type="submit" name="action" value="Approved" disabled={pending}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-60"
-            style={{ background: '#1F8A55' }}>
-            <CheckCircle2 className="w-4 h-4" /> {pending ? 'Sending…' : 'Approve'}
+            type="submit" name="action" value="Approved" disabled={pending || isApproved}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-opacity disabled:cursor-default"
+            style={isApproved
+              ? { background: '#EDEAF2', color: '#9B8BC2' }
+              : { background: '#1F8A55', color: '#fff' }}>
+            <CheckCircle2 className="w-4 h-4" /> {isApproved ? 'Approved' : pending ? 'Sending…' : 'Approve'}
           </button>
           <button
             type="submit" name="action" value="Changes requested" disabled={pending}
             className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-60"
-            style={{ background: '#fff', border: '1.5px solid #E7E0F5', color: '#6B5B95' }}>
-            <PencilRuler className="w-4 h-4" /> Request changes
+            style={isChanges
+              ? { background: '#B8860B', color: '#fff' }
+              : { background: '#fff', border: '1.5px solid #E7E0F5', color: '#6B5B95' }}>
+            <PencilRuler className="w-4 h-4" /> {isChanges ? 'Update request' : 'Request changes'}
           </button>
         </div>
+
+        {isApproved && (
+          <p className="text-[11px] text-center" style={{ color: '#B0A2CE' }}>
+            Approved by mistake? Add a note and tap “Request changes”.
+          </p>
+        )}
       </form>
 
       {/* contact options */}
