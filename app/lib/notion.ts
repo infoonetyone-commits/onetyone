@@ -19,6 +19,7 @@ export interface Post {
   clientStatus: ClientStatus // client-friendly label (internal stages hidden)
   caption: string
   graphicUrl: string | null
+  clientApproval: string // the client's own Approved / Changes Requested / Pending state
   // NOTE: internal "Notes" field (consent flags etc.) is deliberately never exposed.
 }
 
@@ -109,6 +110,7 @@ export async function getPosts(databaseId?: string): Promise<Post[]> {
         clientStatus: toClientStatus(status),
         caption: readText(p['Caption']),
         graphicUrl: readUrl(p['Graphic Link']),
+        clientApproval: readSelect(p['Client Status']),
       }
     })
     /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -143,6 +145,33 @@ function mock(
     clientStatus: 'In Production',
     caption,
     graphicUrl: null,
+    clientApproval: '',
+  }
+}
+
+/**
+ * Write the client's approval decision back to their Notion page.
+ * Requires a "Client Status" Select property on the database.
+ * Best-effort: returns false (and logs) on any failure so callers can still
+ * fall back to email notification.
+ */
+export async function setClientApproval(
+  pageId: string,
+  status: 'Approved' | 'Changes Requested' | 'Pending',
+): Promise<boolean> {
+  const token = process.env.NOTION_TOKEN
+  if (!token || !pageId) return false
+  try {
+    const notion = new Client({ auth: token })
+    await notion.pages.update({
+      page_id: pageId,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      properties: { 'Client Status': { select: { name: status } } } as any,
+    })
+    return true
+  } catch (err) {
+    console.error('[notion] setClientApproval failed:', err)
+    return false
   }
 }
 

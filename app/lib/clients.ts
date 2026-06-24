@@ -38,6 +38,13 @@ export const CLIENTS: Record<string, ClientConfig> = {
   },
 }
 
+// OnetyOne contact details used by the portal's "Call us" / "Email us" actions.
+export const AGENCY = {
+  email: 'info.onetyone@gmail.com',
+  // Digits only, with country code, e.g. '61412345678'. Empty = hide the Call button.
+  phone: '',
+}
+
 export function getClient(slug: string): ClientConfig | undefined {
   return CLIENTS[slug]
 }

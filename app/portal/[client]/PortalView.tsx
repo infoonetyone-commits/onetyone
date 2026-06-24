@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useActionState, useMemo, useState } from 'react'
 import Image from 'next/image'
 import {
   Calendar as CalendarIcon,
@@ -11,7 +11,11 @@ import {
   Clock3,
   Send,
   PencilRuler,
+  Phone,
+  Mail,
 } from 'lucide-react'
+import { AGENCY } from '../../lib/clients'
+import { submitFeedback } from './actions'
 
 // Brand icons (lucide v1 dropped these — inline SVGs instead)
 function Instagram({ className }: { className?: string }) {
@@ -197,7 +201,7 @@ export default function PortalView({ config, posts }: { config: ClientConfig; po
 
       {/* ════════ POST DETAIL MODAL ════════ */}
       {active && (
-        <PostModal post={active} accent={accentFor(active.business)} onClose={() => setActive(null)} />
+        <PostModal post={active} accent={accentFor(active.business)} slug={config.slug} onClose={() => setActive(null)} />
       )}
     </div>
   )
@@ -370,7 +374,7 @@ function ListView({ posts, accentFor, onSelect }: {
 
 // ─── Post detail modal ────────────────────────────────────────────────────────
 
-function PostModal({ post, accent, onClose }: { post: Post; accent: string; onClose: () => void }) {
+function PostModal({ post, accent, slug, onClose }: { post: Post; accent: string; slug: string; onClose: () => void }) {
   const { d, m, y } = post.postDate ? parseDay(post.postDate) : { d: 0, m: 0, y: 0 }
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6 portal-modal-backdrop"
@@ -422,7 +426,94 @@ function PostModal({ post, accent, onClose }: { post: Post; accent: string; onCl
               <span className="text-xs" style={{ color: '#9B8BC2' }}>Graphic in production</span>
             </div>
           )}
+
+          {/* feedback / approval */}
+          <FeedbackSection slug={slug} post={post} />
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Feedback / approval section ──────────────────────────────────────────────
+
+function FeedbackSection({ slug, post }: { slug: string; post: Post }) {
+  const [state, formAction, pending] = useActionState(submitFeedback, null)
+  const already = post.clientApproval // 'Approved' | 'Changes Requested' | 'Pending' | ''
+
+  if (state?.success) {
+    return (
+      <div className="mt-6 rounded-2xl px-5 py-6 text-center" style={{ background: '#E4F5EC', border: '1px solid #Bfe6cf' }}>
+        <CheckCircle2 className="w-7 h-7 mx-auto mb-2" style={{ color: '#1F8A55' }} />
+        <p className="text-sm font-semibold" style={{ color: '#1F6B45' }}>{state.message}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-6 pt-5" style={{ borderTop: '1px solid #EFEAF8' }}>
+      <p className="text-[11px] font-semibold tracking-wider uppercase mb-3" style={{ color: '#9B8BC2' }}>Your feedback</p>
+
+      {already && (
+        <p className="text-xs mb-3 px-3 py-2 rounded-lg" style={{ background: '#F4F0FB', color: '#6B5B95' }}>
+          You previously marked this <strong>{already}</strong>. You can update it below.
+        </p>
+      )}
+
+      <form action={formAction} className="space-y-3">
+        <input type="hidden" name="clientSlug" value={slug} />
+        <input type="hidden" name="postId" value={post.id} />
+        <input type="hidden" name="postTitle" value={post.title} />
+        <input type="hidden" name="business" value={post.business} />
+        <input type="hidden" name="postDate" value={post.postDate ?? ''} />
+
+        <textarea
+          name="comment"
+          rows={3}
+          placeholder="Any comments or changes? (optional when approving, required for changes)"
+          className="w-full text-sm rounded-xl px-3 py-2.5 outline-none resize-none"
+          style={{ background: '#F7F3FD', border: '1px solid #E7E0F5', color: '#3D2A66' }}
+        />
+
+        {state?.message && !state.success && (
+          <p className="text-xs font-medium" style={{ color: '#C0392B' }}>{state.message}</p>
+        )}
+
+        <div className="flex gap-2">
+          <button
+            type="submit" name="action" value="Approved" disabled={pending}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold text-white transition-opacity disabled:opacity-60"
+            style={{ background: '#1F8A55' }}>
+            <CheckCircle2 className="w-4 h-4" /> {pending ? 'Sending…' : 'Approve'}
+          </button>
+          <button
+            type="submit" name="action" value="Changes requested" disabled={pending}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-60"
+            style={{ background: '#fff', border: '1.5px solid #E7E0F5', color: '#6B5B95' }}>
+            <PencilRuler className="w-4 h-4" /> Request changes
+          </button>
+        </div>
+      </form>
+
+      {/* contact options */}
+      <div className="flex items-center gap-3 my-4">
+        <div className="flex-1 h-px" style={{ background: '#EFEAF8' }} />
+        <span className="text-[10px] uppercase tracking-wider" style={{ color: '#B0A2CE' }}>or reach us directly</span>
+        <div className="flex-1 h-px" style={{ background: '#EFEAF8' }} />
+      </div>
+      <div className="flex gap-2">
+        {AGENCY.phone && (
+          <a href={`tel:+${AGENCY.phone}`}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold"
+            style={{ background: PURPLE, color: '#fff' }}>
+            <Phone className="w-4 h-4" /> Call us
+          </a>
+        )}
+        <a href={`mailto:${AGENCY.email}?subject=${encodeURIComponent(`Re: ${post.title}`)}`}
+          className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold"
+          style={{ background: '#F4F0FB', color: PURPLE }}>
+          <Mail className="w-4 h-4" /> Email us
+        </a>
       </div>
     </div>
   )
