@@ -186,7 +186,9 @@ export default function PortalView({ config, posts }: { config: ClientConfig; po
       {/* ════════ FOOTER ════════ */}
       <footer className="px-5 sm:px-8 py-10 text-center" style={{ borderTop: '1px solid #EBE4F7' }}>
         <p className="text-xs" style={{ color: '#9B8BC2' }}>
-          Managed by <span className="font-semibold" style={{ color: PURPLE }}>{config.managedBy}</span> · hello@sonderclicks.com.au
+          Managed by <span className="font-semibold" style={{ color: PURPLE }}>{config.managedBy}</span>
+          {' · '}
+          <a href="mailto:info.onetyone@gmail.com" className="hover:underline" style={{ color: '#9B8BC2' }}>info.onetyone@gmail.com</a>
         </p>
         <p className="text-[11px] mt-1.5" style={{ color: '#C4B5E8' }}>
           © {new Date().getFullYear()} {config.managedBy}. This hub is private to {config.name}.
