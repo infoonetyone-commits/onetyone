@@ -42,7 +42,7 @@ export const CLIENTS: Record<string, ClientConfig> = {
 export const AGENCY = {
   email: 'info.onetyone@gmail.com',
   // Digits only, with country code, e.g. '61412345678'. Empty = hide the Call button.
-  phone: '',
+  phone: '61416316119',
 }
 
 export function getClient(slug: string): ClientConfig | undefined {
